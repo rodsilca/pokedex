@@ -1,31 +1,22 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, NgClass } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
-import { FormsModule } from '@angular/forms'; // Import para usar ngModel nos formulários
+import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 
 // --- INTERFACES ---
-export interface Pokemon {
-  id: string;
-  name: string;
-  imageUrl: string;
-}
-export interface User {
-  id: number;
-  nome: string;
-  login: string;
-}
+export interface ApiPokemon { id: string; name: string; imageUrl: string; types: string[]; }
+export interface UserPokemon { codigo: string; nome: string; favorito: boolean; grupo_batalha: boolean; }
+export interface Pokemon extends ApiPokemon { isFavorite: boolean; isInBattleTeam: boolean; }
+export interface User { id: number; nome: string; login: string; }
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    CommonModule,
-    HttpClientModule,
-    FormsModule // Adiciona o módulo de formulários
-  ],
+  imports: [ CommonModule, HttpClientModule, FormsModule, NgClass ],
   template: `
     <div class="main-container">
-      <!-- CABEÇALHO -->
+      <!-- CABEÇALHO (sem mudanças) -->
       <header>
         <div class="top-bar">
           <div class="container header-content">
@@ -33,7 +24,6 @@ export interface User {
               <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="48px" height="48px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-9h4v2h-4v-2zm-2-3h8v2h-8v-2z"/></svg>
               <h1>Pokédex Digital</h1>
             </div>
-            <!-- Exibe informações do usuário e botão de logout se estiver logado -->
             <div *ngIf="isLoggedIn && user" class="user-info">
               <span>Olá, {{ user.nome }}</span>
               <button (click)="logout()" class="logout-btn">Sair</button>
@@ -44,51 +34,27 @@ export interface User {
 
       <!-- CONTEÚDO PRINCIPAL -->
       <main class="container">
-        <!-- TELA DE LOGIN/REGISTRO -->
+        <!-- TELA DE LOGIN/REGISTRO (sem mudanças) -->
         <div *ngIf="!isLoggedIn; else pokedexContent">
           <div class="auth-container">
-            <!-- Formulário de Login -->
             <div *ngIf="authMode === 'login'" class="auth-form">
-              <h2>Acessar sua Pokédex</h2>
-              <p>Faça login para ver seus Pokémon.</p>
+              <h2>Acessar sua Pokédex</h2><p>Faça login para ver seus Pokémon.</p>
               <form (ngSubmit)="onLoginSubmit()">
-                <div class="form-group">
-                  <label for="login-login">Login</label>
-                  <input id="login-login" type="text" [(ngModel)]="loginData.login" name="login" required>
-                </div>
-                <div class="form-group">
-                  <label for="login-senha">Senha</label>
-                  <input id="login-senha" type="password" [(ngModel)]="loginData.senha" name="senha" required>
-                </div>
+                <div class="form-group"><label for="login-login">Login</label><input id="login-login" type="text" [(ngModel)]="loginData.login" name="login" required></div>
+                <div class="form-group"><label for="login-senha">Senha</label><input id="login-senha" type="password" [(ngModel)]="loginData.senha" name="senha" required></div>
                 <div *ngIf="authError" class="error-message">{{ authError }}</div>
                 <button type="submit" class="auth-btn">Entrar</button>
               </form>
               <p class="switch-auth">Não tem uma conta? <a (click)="switchAuthMode('register')">Registre-se</a></p>
             </div>
-
-            <!-- Formulário de Registro -->
             <div *ngIf="authMode === 'register'" class="auth-form">
-              <h2>Crie sua Conta</h2>
-              <p>É rápido e fácil.</p>
+              <h2>Crie sua Conta</h2><p>É rápido e fácil.</p>
               <form (ngSubmit)="onRegisterSubmit()">
-                 <div class="form-group">
-                  <label for="reg-nome">Nome</label>
-                  <input id="reg-nome" type="text" [(ngModel)]="registerData.nome" name="reg-nome" required>
-                </div>
-                 <div class="form-group">
-                  <label for="reg-login">Login</label>
-                  <input id="reg-login" type="text" [(ngModel)]="registerData.login" name="reg-login" required>
-                </div>
-                 <div class="form-group">
-                  <label for="reg-email">Email</label>
-                  <input id="reg-email" type="email" [(ngModel)]="registerData.email" name="reg-email" required>
-                </div>
-                <div class="form-group">
-                  <label for="reg-senha">Senha</label>
-                  <input id="reg-senha" type="password" [(ngModel)]="registerData.senha" name="reg-senha" required>
-                </div>
-                <div *ngIf="authError" class="error-message">{{ authError }}</div>
-                <div *ngIf="authSuccess" class="success-message">{{ authSuccess }}</div>
+                 <div class="form-group"><label for="reg-nome">Nome</label><input id="reg-nome" type="text" [(ngModel)]="registerData.nome" name="reg-nome" required></div>
+                 <div class="form-group"><label for="reg-login">Login</label><input id="reg-login" type="text" [(ngModel)]="registerData.login" name="reg-login" required></div>
+                 <div class="form-group"><label for="reg-email">Email</label><input id="reg-email" type="email" [(ngModel)]="registerData.email" name="reg-email" required></div>
+                <div class="form-group"><label for="reg-senha">Senha</label><input id="reg-senha" type="password" [(ngModel)]="registerData.senha" name="reg-senha" required></div>
+                <div *ngIf="authError" class="error-message">{{ authError }}</div><div *ngIf="authSuccess" class="success-message">{{ authSuccess }}</div>
                 <button type="submit" class="auth-btn">Registrar</button>
               </form>
               <p class="switch-auth">Já tem uma conta? <a (click)="switchAuthMode('login')">Faça Login</a></p>
@@ -96,46 +62,69 @@ export interface User {
           </div>
         </div>
 
-        <!-- CONTEÚDO DA POKÉDEX (visível apenas após login) -->
+        <!-- CONTEÚDO DA POKÉDEX -->
         <ng-template #pokedexContent>
-          <h2>Pokémon Descobertos</h2>
+          <div class="pokedex-header">
+              <h2>Pokémon Descobertos</h2>
+              <div class="stats">
+                  <div class="stat-item" title="Total de Pokémon favoritados">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                      <span>{{ favoritesCount }} Favoritos</span>
+                  </div>
+                  <div class="stat-item" title="Pokémon selecionados para o time de batalha">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M11 23.596L2.479 18.223c-1.295-.816-2.121-2.196-2.121-3.699V4.653c0-1.503.826-2.883 2.121-3.699L11 .579l.92.581.92-.581 8.521 5.375c1.295.816 2.121 2.196 2.121 3.699v9.871c0 1.503-.826-2.883-2.121 3.699L12.08 24l-.92-.581-.001.002zM12 2.716L4.5 7.42v9.16c0 .751.413 1.441 1.061 1.85l6.44 4.062 6.439-4.062c.648-.409 1.06-1.099 1.06-1.85V7.42L12 2.716zm-1 14.784V7.5h2v10h-2z"/></svg>
+                      <span>{{ battleTeamCount }} / 6 no Time</span>
+                  </div>
+              </div>
+          </div>
+          
           <div *ngIf="pokemons.length > 0; else loadingTemplate" class="pokemon-grid">
             <div *ngFor="let pokemon of pokemons" class="pokemon-card">
-               <div class="card-header"><span class="pokemon-id">#{{ pokemon.id.padStart(4, '0') }}</span></div>
-               <div class="image-container">
-                <div class="image-bg"></div>
-                <img [src]="pokemon.imageUrl" [alt]="'Imagem do ' + pokemon.name" (error)="onImageError($event)">
+               <div class="card-header">
+                 <span class="pokemon-id">#{{ pokemon.id.padStart(4, '0') }}</span>
+                 <div class="actions">
+                    <button class="action-btn" [class.active]="pokemon.isInBattleTeam" (click)="toggleBattleTeam(pokemon)" [disabled]="!pokemon.isInBattleTeam && battleTeamCount >= 6" title="Adicionar ao Time de Batalha">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M11 23.596L2.479 18.223c-1.295-.816-2.121-2.196-2.121-3.699V4.653c0-1.503.826-2.883 2.121-3.699L11 .579l.92.581.92-.581 8.521 5.375c1.295.816 2.121 2.196 2.121 3.699v9.871c0 1.503-.826-2.883-2.121 3.699L12.08 24l-.92-.581-.001.002zM12 2.716L4.5 7.42v9.16c0 .751.413 1.441 1.061 1.85l6.44 4.062 6.439-4.062c.648-.409 1.06-1.099 1.06-1.85V7.42L12 2.716zm-1 14.784V7.5h2v10h-2z"/></svg>
+                    </button>
+                    <button class="action-btn" [class.active]="pokemon.isFavorite" (click)="toggleFavorite(pokemon)" title="Favoritar Pokémon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    </button>
+                 </div>
                </div>
-               <div class="card-footer"><h3 class="pokemon-name">{{ capitalizeFirstLetter(pokemon.name) }}</h3></div>
+               <div class="image-container"><div class="image-bg"></div><img [src]="pokemon.imageUrl" [alt]="'Imagem do ' + pokemon.name" (error)="onImageError($event)"></div>
+               <div class="card-footer">
+                 <h3 class="pokemon-name">{{ capitalizeFirstLetter(pokemon.name) }}</h3>
+                 <div class="types-container">
+                   <span *ngFor="let type of pokemon.types" class="type-badge" [ngClass]="'type-' + type">{{ type }}</span>
+                 </div>
+               </div>
             </div>
           </div>
-          <ng-template #loadingTemplate>
-            <div class="loading-message"><p>{{ apiError || 'Carregando Pokémon...' }}</p></div>
-          </ng-template>
+          <!-- NOVO: Botão para carregar mais Pokémon -->
+          <div *ngIf="pokemons.length > 0 && !allPokemonsLoaded" class="load-more-container">
+              <button (click)="loadMorePokemons()" [disabled]="isLoadingMore" class="load-more-btn">
+                  <span *ngIf="!isLoadingMore">Carregar Mais</span>
+                  <span *ngIf="isLoadingMore">Carregando...</span>
+              </button>
+          </div>
+          <ng-template #loadingTemplate><div class="loading-message"><p>{{ apiError || 'Carregando Pokémon...' }}</p></div></ng-template>
         </ng-template>
       </main>
     </div>
   `,
   styles: [`
-    /* ESTILOS GLOBAIS E DE LAYOUT (semelhante ao anterior) */
     :host { font-family: "Inter", sans-serif; }
     .main-container { background-color: #f9fafb; min-height: 100vh; }
     .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
-    
-    /* CABEÇALHO */
     header .top-bar { background-color: #e74c3c; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .header-content { display: flex; justify-content: space-between; align-items: center; }
     .logo-area { display: flex; align-items: center; }
     header .logo { width: 2.5rem; height: 2.5rem; margin-right: 1rem; }
     header h1 { font-size: 1.75rem; font-weight: 700; color: white; }
-    
-    /* ÁREA DO USUÁRIO */
     .user-info { display: flex; align-items: center; color: white; }
     .user-info span { margin-right: 1rem; font-weight: 700; }
     .logout-btn { background-color: white; color: #e74c3c; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-weight: 700; transition: background-color 0.2s; }
     .logout-btn:hover { background-color: #f1f1f1; }
-    
-    /* ESTILOS DOS FORMULÁRIOS DE AUTENTICAÇÃO */
     .auth-container { max-width: 450px; margin: 4rem auto; background: white; padding: 2.5rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
     .auth-form h2 { font-size: 1.75rem; font-weight: 800; text-align: center; color: #2d3748; }
     .auth-form p { text-align: center; color: #718096; margin-bottom: 2rem; }
@@ -148,122 +137,189 @@ export interface User {
     .switch-auth a { color: #e74c3c; font-weight: 700; cursor: pointer; }
     .error-message { color: #e74c3c; background-color: #fdd; padding: 0.75rem; border-radius: 0.5rem; text-align: center; margin-bottom: 1rem; }
     .success-message { color: #27ae60; background-color: #d6f5e0; padding: 0.75rem; border-radius: 0.5rem; text-align: center; margin-bottom: 1rem; }
-
-    /* ESTILOS DA POKÉDEX (semelhante ao anterior) */
-    main h2 { font-size: 2rem; font-weight: 800; color: #2d3748; margin-bottom: 1.5rem; }
+    .pokedex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+    .pokedex-header h2 { margin-bottom: 0; font-size: 2rem; font-weight: 800; color: #2d3748; }
+    .stats { display: flex; gap: 1.5rem; }
+    .stat-item { display: flex; align-items: center; font-weight: 600; color: #4a5568; }
+    .stat-item svg { width: 1.25rem; height: 1.25rem; margin-right: 0.5rem; color: #a0aec0; }
+    .stat-item:first-of-type svg { color: #e53e3e; }
+    .stat-item:last-of-type svg { color: #3182ce; }
     .pokemon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; }
     .pokemon-card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); overflow: hidden; transition: all 0.2s ease-in-out; border: 1px solid #e2e8f0; }
     .pokemon-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
-    .card-header { padding: 0.75rem 1rem; }
+    .card-header { padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; }
     .pokemon-id { font-size: 0.875rem; font-weight: 700; color: #718096; }
+    .actions { display: flex; gap: 0.5rem; }
+    .action-btn { background: none; border: none; padding: 0.25rem; cursor: pointer; color: #cbd5e0; transition: color 0.2s ease; }
+    .action-btn:hover { color: #a0aec0; }
+    .action-btn.active { color: #e53e3e; }
+    .action-btn:nth-of-type(1).active { color: #3182ce; }
+    .action-btn svg { width: 1.25rem; height: 1.25rem; }
+    .action-btn:disabled { color: #e2e8f0; cursor: not-allowed; }
     .image-container { position: relative; height: 12rem; display: flex; justify-content: center; align-items: center; }
     .image-bg { position: absolute; inset: 0; background-color: #e2e8f0; border-radius: 50%; margin: 1.5rem 2.5rem; filter: blur(24px); opacity: 0.7; }
     img { width: 10rem; height: 10rem; object-fit: contain; position: relative; z-index: 10; }
     .card-footer { padding: 1rem; text-align: center; background-color: #f7fafc; border-top: 1px solid #e2e8f0; }
-    .pokemon-name { font-size: 1.25rem; font-weight: 700; color: #2d3748; }
+    .pokemon-name { font-size: 1.25rem; font-weight: 700; color: #2d3748; margin-bottom: 0.5rem; }
     .loading-message { text-align: center; padding: 3rem 0; color: #4a5568; font-size: 1.125rem; }
+    .types-container { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .type-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: white; text-transform: capitalize; }
+    .type-grass { background-color: #78C850; } .type-fire { background-color: #F08030; } .type-water { background-color: #6890F0; } .type-bug { background-color: #A8B820; } .type-normal { background-color: #A8A878; } .type-poison { background-color: #A040A0; } .type-electric { background-color: #F8D030; } .type-ground { background-color: #E0C068; } .type-fairy { background-color: #EE99AC; } .type-fighting { background-color: #C03028; } .type-psychic { background-color: #F85888; } .type-rock { background-color: #B8A038; } .type-ghost { background-color: #705898; } .type-ice { background-color: #98D8D8; } .type-dragon { background-color: #7038F8; } .type-flying { background-color: #A890F0; } .type-steel { background-color: #B8B8D0; } .type-dark { background-color: #705848; }
+    /* NOVOS ESTILOS PARA O BOTÃO */
+    .load-more-container { text-align: center; padding: 2rem 0; }
+    .load-more-btn { background-color: #3182ce; color: white; border: none; padding: 0.75rem 2rem; border-radius: 0.5rem; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background-color 0.2s; }
+    .load-more-btn:hover:not(:disabled) { background-color: #2b6cb0; }
+    .load-more-btn:disabled { background-color: #a0aec0; cursor: not-allowed; }
   `]
 })
 export class AppComponent implements OnInit {
   private http = inject(HttpClient);
   private apiUrl = 'http://127.0.0.1:5000/api';
+  private readonly POKEMON_PAGE_LIMIT = 20;
+  private offset = 0;
+  private userPokemonsMap = new Map<string, UserPokemon>();
 
-  // Estado da aplicação
   isLoggedIn = false;
   user: User | null = null;
   authMode: 'login' | 'register' = 'login';
   pokemons: Pokemon[] = [];
-  
-  // Mensagens de erro/sucesso
+  isLoadingMore = false;
+  allPokemonsLoaded = false;
   authError: string | null = null;
   authSuccess: string | null = null;
   apiError: string | null = null;
-  
-  // Dados dos formulários
   loginData = { login: '', senha: '' };
   registerData = { nome: '', login: '', email: '', senha: '' };
 
-  ngOnInit() {
-    this.checkLoginStatus();
-  }
+  get favoritesCount(): number { return Array.from(this.userPokemonsMap.values()).filter(p => p.favorito).length; }
+  get battleTeamCount(): number { return Array.from(this.userPokemonsMap.values()).filter(p => p.grupo_batalha).length; }
+
+  ngOnInit() { this.checkLoginStatus(); }
 
   checkLoginStatus() {
     const token = localStorage.getItem('pokedex_token');
     const userData = localStorage.getItem('pokedex_user');
     if (token && userData) {
-      this.isLoggedIn = true;
-      this.user = JSON.parse(userData);
-      this.loadPokemons();
+      this.isLoggedIn = true; this.user = JSON.parse(userData);
+      this.loadInitialPokemons();
     }
   }
 
   switchAuthMode(mode: 'login' | 'register') {
-    this.authMode = mode;
-    this.authError = null; // Limpa erros ao trocar de formulário
-    this.authSuccess = null;
+    this.authMode = mode; this.authError = null; this.authSuccess = null;
   }
 
   onRegisterSubmit() {
-    this.authError = null;
-    this.authSuccess = null;
     this.http.post<any>(`${this.apiUrl}/register`, this.registerData).subscribe({
-      next: (response) => {
-        this.authSuccess = `${response.message} Agora você pode fazer o login.`;
-        this.switchAuthMode('login');
-      },
-      error: (err) => {
-        this.authError = err.error.message || 'Ocorreu um erro durante o registro.';
-      }
+      next: (res) => { this.authSuccess = `${res.message} Agora pode fazer o login.`; this.switchAuthMode('login'); },
+      error: (err) => { this.authError = err.error.message || 'Ocorreu um erro no registro.'; }
     });
   }
 
   onLoginSubmit() {
-    this.authError = null;
     this.http.post<any>(`${this.apiUrl}/login`, this.loginData).subscribe({
-      next: (response) => {
-        // Salva o token e os dados do usuário no localStorage
-        localStorage.setItem('pokedex_token', response.token);
-        localStorage.setItem('pokedex_user', JSON.stringify(response.user));
-        this.isLoggedIn = true;
-        this.user = response.user;
-        this.loadPokemons();
+      next: (res) => {
+        localStorage.setItem('pokedex_token', res.token); localStorage.setItem('pokedex_user', JSON.stringify(res.user));
+        this.isLoggedIn = true; this.user = res.user;
+        this.loadInitialPokemons();
       },
-      error: (err) => {
-        this.authError = err.error.message || 'Falha no login.';
-      }
+      error: (err) => { this.authError = err.error.message || 'Falha no login.'; }
     });
   }
 
   logout() {
-    localStorage.removeItem('pokedex_token');
-    localStorage.removeItem('pokedex_user');
-    this.isLoggedIn = false;
-    this.user = null;
-    this.pokemons = [];
-    this.loginData = { login: '', senha: '' }; // Limpa campos
+    localStorage.clear();
+    this.isLoggedIn = false; this.user = null; this.pokemons = [];
+    this.offset = 0; this.allPokemonsLoaded = false;
+    this.userPokemonsMap.clear(); this.loginData = { login: '', senha: '' };
   }
 
-  loadPokemons() {
+  loadInitialPokemons() {
     const token = localStorage.getItem('pokedex_token');
-    if (!token) {
-      this.apiError = "Você não está autenticado.";
-      return;
-    }
-    
+    if (!token) return;
     const headers = new HttpHeaders().set('x-access-token', token);
     
-    this.http.get<Pokemon[]>(`${this.apiUrl}/pokemon`, { headers }).subscribe({
-      next: (data) => { this.pokemons = data; },
+    this.offset = 0; this.pokemons = []; this.allPokemonsLoaded = false;
+
+    forkJoin({
+      apiPokemons: this.http.get<ApiPokemon[]>(`${this.apiUrl}/pokemon?limit=${this.POKEMON_PAGE_LIMIT}&offset=${this.offset}`, { headers }),
+      userPokemons: this.http.get<UserPokemon[]>(`${this.apiUrl}/user/pokemons`, { headers })
+    }).subscribe({
+      next: ({ apiPokemons, userPokemons }) => {
+        this.userPokemonsMap = new Map(userPokemons.map(p => [p.codigo, p]));
+        this.pokemons = this.mapApiPokemons(apiPokemons);
+        this.offset += this.POKEMON_PAGE_LIMIT;
+        if (apiPokemons.length < this.POKEMON_PAGE_LIMIT) this.allPokemonsLoaded = true;
+      },
+      error: (err) => { this.handleApiError(err); }
+    });
+  }
+
+  loadMorePokemons() {
+    if (this.isLoadingMore || this.allPokemonsLoaded) return;
+    const token = localStorage.getItem('pokedex_token');
+    if (!token) return;
+    const headers = new HttpHeaders().set('x-access-token', token);
+
+    this.isLoadingMore = true;
+    this.http.get<ApiPokemon[]>(`${this.apiUrl}/pokemon?limit=${this.POKEMON_PAGE_LIMIT}&offset=${this.offset}`, { headers })
+      .subscribe({
+        next: (newApiPokemons) => {
+          this.pokemons.push(...this.mapApiPokemons(newApiPokemons));
+          this.offset += this.POKEMON_PAGE_LIMIT;
+          this.isLoadingMore = false;
+          if (newApiPokemons.length < this.POKEMON_PAGE_LIMIT) this.allPokemonsLoaded = true;
+        },
+        error: (err) => { this.isLoadingMore = false; this.handleApiError(err); }
+      });
+  }
+
+  private mapApiPokemons(apiPokemons: ApiPokemon[]): Pokemon[] {
+    return apiPokemons.map(apiPokemon => ({
+      ...apiPokemon,
+      isFavorite: this.userPokemonsMap.get(apiPokemon.id)?.favorito ?? false,
+      isInBattleTeam: this.userPokemonsMap.get(apiPokemon.id)?.grupo_batalha ?? false
+    }));
+  }
+
+  toggleFavorite(pokemon: Pokemon) {
+    pokemon.isFavorite = !pokemon.isFavorite;
+    this.updatePokemonOnServer(pokemon, { favorito: pokemon.isFavorite });
+  }
+
+  toggleBattleTeam(pokemon: Pokemon) {
+    if (!pokemon.isInBattleTeam && this.battleTeamCount >= 6) {
+      alert("O time de batalha já está cheio!"); return;
+    }
+    pokemon.isInBattleTeam = !pokemon.isInBattleTeam;
+    this.updatePokemonOnServer(pokemon, { grupo_batalha: pokemon.isInBattleTeam });
+  }
+
+  private updatePokemonOnServer(pokemon: Pokemon, payload: { favorito?: boolean; grupo_batalha?: boolean; }) {
+    const token = localStorage.getItem('pokedex_token');
+    if (!token) return;
+    const headers = new HttpHeaders().set('x-access-token', token);
+    const body = { codigo: pokemon.id, nome: pokemon.name, imagem_url: pokemon.imageUrl, ...payload };
+
+    this.http.post<any>(`${this.apiUrl}/user/pokemons`, body, { headers }).subscribe({
+      next: (res) => {
+        const updated = res.pokemon;
+        this.userPokemonsMap.set(updated.codigo, { ...this.userPokemonsMap.get(updated.codigo), ...updated });
+      },
       error: (err) => {
-        this.apiError = 'Não foi possível carregar os Pokémon. Sua sessão pode ter expirado.';
-        if (err.status === 401) {
-            this.logout(); // Desloga o usuário se o token for inválido
-        }
+        alert('Erro ao salvar: ' + (err.error.message || 'Tente novamente.'));
+        if (payload.favorito !== undefined) pokemon.isFavorite = !payload.favorito;
+        if (payload.grupo_batalha !== undefined) pokemon.isInBattleTeam = !payload.grupo_batalha;
       }
     });
   }
-  
-  // Funções utilitárias
+
+  private handleApiError(err: any) {
+    this.apiError = 'Não foi possível carregar os Pokémon.';
+    if (err.status === 401) this.logout();
+  }
+
   capitalizeFirstLetter(name: string): string { return name ? name.charAt(0).toUpperCase() + name.slice(1) : ''; }
   onImageError(event: Event) { (event.target as HTMLImageElement).src = 'https://placehold.co/160x160/f8f8f8/ccc?text=Pkm'; }
 }
+
