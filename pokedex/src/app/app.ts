@@ -205,9 +205,15 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedGenerationId: number = 0;
   generations = [
     { id: 0, name: 'Todas as Gerações', limit: this.POKEMON_PAGE_LIMIT, offset: 0 },
-    { id: 1, name: 'Geração 1', limit: 151, offset: 0 }, { id: 2, name: 'Geração 2', limit: 100, offset: 151 },
-    { id: 3, name: 'Geração 3', limit: 135, offset: 251 }, { id: 4, name: 'Geração 4', limit: 107, offset: 386 },
+    { id: 1, name: 'Geração 1', limit: 151, offset: 0 },
+    { id: 2, name: 'Geração 2', limit: 100, offset: 151 },
+    { id: 3, name: 'Geração 3', limit: 135, offset: 251 }, 
+    { id: 4, name: 'Geração 4', limit: 107, offset: 386 },
     { id: 5, name: 'Geração 5', limit: 156, offset: 493 },
+    { id: 6, name: 'Geração 6', limit: 72, offset: 649 },
+    { id: 7, name: 'Geração 7', limit: 88, offset: 721 },
+    { id: 8, name: 'Geração 8', limit: 96, offset: 809 },
+    { id: 9, name: 'Geração 9', limit: 120, offset: 905 }
   ];
 
   isLoggedIn = false; user: User | null = null; authMode: 'login' | 'register' = 'login';
