@@ -1,0 +1,1 @@
+from . import auth_routes, pokemon_routes, user_routes
