@@ -1,11 +1,10 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, HostListener } from '@angular/core';
 import { CommonModule, NgClass } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Subject, Subscription, forkJoin } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
-// --- INTERFACES ---
 export interface ApiPokemon { id: string; name: string; imageUrl: string; types: string[]; }
 export interface UserPokemon { codigo: string; nome: string; favorito: boolean; grupo_batalha: boolean; }
 export interface Pokemon extends ApiPokemon { isFavorite: boolean; isInBattleTeam: boolean; }
@@ -34,7 +33,8 @@ export interface User { id: number; nome: string; login: string; }
 
       <main class="container">
         <div *ngIf="!isLoggedIn; else pokedexContent">
-          <div class="auth-container">
+          <!-- Bloco de Autenticação (sem mudanças) -->
+          <div class.auth-container>
             <div *ngIf="authMode === 'login'" class="auth-form">
               <h2>Acessar sua Pokédex</h2><p>Faça login para ver seus Pokémon.</p>
               <form (ngSubmit)="onLoginSubmit()">
@@ -77,7 +77,7 @@ export interface User { id: number; nome: string; login: string; }
               </div>
               <div class="search-and-gen-filters">
                 <div class="generation-filter">
-                   <select [ngModel]="selectedGenerationId" (ngModelChange)="onGenerationChange($event)" [disabled]="isSearching">
+                   <select [ngModel]="selectedGenerationId" (ngModelChange)="onGenerationChange($event)" [disabled]="isSearching || isSpecialView">
                      <option *ngFor="let gen of generations" [value]="gen.id">{{ gen.name }}</option>
                    </select>
                 </div>
@@ -89,8 +89,8 @@ export interface User { id: number; nome: string; login: string; }
           </div>
           
           <div *ngIf="!isLoadingInitialData; else loadingTemplate">
-            <div *ngIf="displayedPokemons.length > 0" class="pokemon-grid">
-                <div *ngFor="let pokemon of displayedPokemons" class="pokemon-card">
+            <div *ngIf="pokemons.length > 0" class="pokemon-grid">
+                <div *ngFor="let pokemon of pokemons" class="pokemon-card">
                   <div class="card-header">
                     <span class="pokemon-id">#{{ pokemon.id.padStart(4, '0') }}</span>
                     <div class="actions">
@@ -105,16 +105,14 @@ export interface User { id: number; nome: string; login: string; }
                   </div>
                 </div>
             </div>
-            <div *ngIf="displayedPokemons.length === 0" class="empty-state">
+            <div *ngIf="pokemons.length === 0" class="empty-state">
               <p *ngIf="apiError">{{ apiError }}</p>
-              <p *ngIf="!apiError && currentView === 'favorites'">Você ainda não favoritou nenhum Pokémon. Clique no coração nos cards!</p>
-              <p *ngIf="!apiError && currentView === 'battleTeam'">Seu time de batalha está vazio. Clique no escudo para adicionar até 6 Pokémon.</p>
+              <p *ngIf="!apiError && currentView === 'favorites'">Você ainda não favoritou nenhum Pokémon.</p>
+              <p *ngIf="!apiError && currentView === 'battleTeam'">Seu time de batalha está vazio.</p>
             </div>
-            <div *ngIf="!isSearching && selectedGenerationId === 0 && !allPokemonsLoaded && displayedPokemons.length > 0" class="load-more-container">
-              <button (click)="loadMorePokemons()" [disabled]="isLoadingMore" class="load-more-btn">
-                  <span *ngIf="!isLoadingMore">Carregar Mais</span>
-                  <span *ngIf="isLoadingMore">Carregando...</span>
-              </button>
+            <!-- Indicador de carregamento para o scroll infinito -->
+            <div *ngIf="isLoadingMore" class="loading-more-indicator">
+              <p>Carregando mais Pokémon...</p>
             </div>
           </div>
           <ng-template #loadingTemplate><div class="loading-message"><p>Carregando Pokémon...</p></div></ng-template>
@@ -161,7 +159,7 @@ export interface User { id: number; nome: string; login: string; }
     .search-box input, .generation-filter select { padding: 0.6rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; }
     .search-box input { width: 250px; }
     .generation-filter select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
-    .generation-filter select:disabled { background-color: #f1f5f9; cursor: not-allowed; }
+    .generation-filter select:disabled { background-color: #f1f5f9; cursor: not-allowed; color: #9ca3af; }
     .pokemon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; }
     .pokemon-card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); overflow: hidden; transition: all 0.2s ease-in-out; border: 1px solid #e2e8f0; }
     .pokemon-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
@@ -183,10 +181,8 @@ export interface User { id: number; nome: string; login: string; }
     .types-container { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
     .type-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: white; text-transform: capitalize; }
     .type-grass { background-color: #78C850; } .type-fire { background-color: #F08030; } .type-water { background-color: #6890F0; } .type-bug { background-color: #A8B820; } .type-normal { background-color: #A8A878; } .type-poison { background-color: #A040A0; } .type-electric { background-color: #F8D030; } .type-ground { background-color: #E0C068; } .type-fairy { background-color: #EE99AC; } .type-fighting { background-color: #C03028; } .type-psychic { background-color: #F85888; } .type-rock { background-color: #B8A038; } .type-ghost { background-color: #705898; } .type-ice { background-color: #98D8D8; } .type-dragon { background-color: #7038F8; } .type-flying { background-color: #A890F0; } .type-steel { background-color: #B8B8D0; } .type-dark { background-color: #705848; }
-    .load-more-container { text-align: center; padding: 2rem 0; }
-    .load-more-btn { background-color: #3182ce; color: white; border: none; padding: 0.75rem 2rem; border-radius: 0.5rem; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background-color 0.2s; }
-    .load-more-btn:hover:not(:disabled) { background-color: #2b6cb0; }
-    .load-more-btn:disabled { background-color: #a0aec0; cursor: not-allowed; }
+    /* NOVO: Estilo para o indicador de carregamento do scroll */
+    .loading-more-indicator { text-align: center; padding: 2rem; color: #718096; font-weight: 600; }
   `]
 })
 export class AppComponent implements OnInit, OnDestroy {
@@ -196,12 +192,11 @@ export class AppComponent implements OnInit, OnDestroy {
   private offset = 0;
   private userPokemonsMap = new Map<string, UserPokemon>();
   
-  // --- Propriedades para a busca com debounce ---
   private searchSubject = new Subject<string>();
   private searchSubscription: Subscription | null = null;
   isSearching = false;
-
-  // --- Propriedades de estado ---
+  
+  isSpecialView = false;
   currentView: 'all' | 'favorites' | 'battleTeam' = 'all';
   searchTerm: string = '';
   viewTitles = { all: 'Pokémon Descobertos', favorites: 'Meus Favoritos', battleTeam: 'Meu Time de Batalha' };
@@ -210,54 +205,43 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedGenerationId: number = 0;
   generations = [
     { id: 0, name: 'Todas as Gerações', limit: this.POKEMON_PAGE_LIMIT, offset: 0 },
-    { id: 1, name: 'Geração 1', limit: 151, offset: 0 },
-    { id: 2, name: 'Geração 2', limit: 100, offset: 151 },
-    { id: 3, name: 'Geração 3', limit: 135, offset: 251 },
-    { id: 4, name: 'Geração 4', limit: 107, offset: 386 },
+    { id: 1, name: 'Geração 1', limit: 151, offset: 0 }, { id: 2, name: 'Geração 2', limit: 100, offset: 151 },
+    { id: 3, name: 'Geração 3', limit: 135, offset: 251 }, { id: 4, name: 'Geração 4', limit: 107, offset: 386 },
     { id: 5, name: 'Geração 5', limit: 156, offset: 493 },
   ];
 
-  isLoggedIn = false;
-  user: User | null = null;
-  authMode: 'login' | 'register' = 'login';
-  pokemons: Pokemon[] = [];
-  isLoadingMore = false;
-  allPokemonsLoaded = false;
-  authError: string | null = null;
-  authSuccess: string | null = null;
-  apiError: string | null = null;
-  loginData = { login: '', senha: '' };
+  isLoggedIn = false; user: User | null = null; authMode: 'login' | 'register' = 'login';
+  pokemons: Pokemon[] = []; isLoadingMore = false; allPokemonsLoaded = false;
+  authError: string | null = null; authSuccess: string | null = null;
+  apiError: string | null = null; loginData = { login: '', senha: '' };
   registerData = { nome: '', login: '', email: '', senha: '' };
   
   get favoritesCount(): number { return Array.from(this.userPokemonsMap.values()).filter(p => p.favorito).length; }
   get battleTeamCount(): number { return Array.from(this.userPokemonsMap.values()).filter(p => p.grupo_batalha).length; }
-
-  get displayedPokemons(): Pokemon[] {
-    // A busca agora acontece via API, então este getter só precisa filtrar pela view (aba)
-    if (this.currentView === 'favorites') {
-      return this.pokemons.filter(p => p.isFavorite);
-    }
-    if (this.currentView === 'battleTeam') {
-      return this.pokemons.filter(p => p.isInBattleTeam);
-    }
-    return this.pokemons;
-  }
   
+  @HostListener('window:scroll', [])
+  onWindowScroll(): void {
+    // condicoes para ativar o scroll infinito
+    if (this.isSpecialView || this.isSearching || this.selectedGenerationId !== 0 || this.allPokemonsLoaded || this.isLoadingMore) {
+      return;
+    }
+
+    const pos = (document.documentElement.scrollTop || document.body.scrollTop) + document.documentElement.offsetHeight;
+    const max = document.documentElement.scrollHeight;
+
+    // dispara a busca 300px antes de chegar ao fim da pagina
+    if (pos >= max - 300) {
+      this.loadMorePokemons();
+    }
+  }
+
   ngOnInit() {
     this.checkLoginStatus();
-    // Configura a busca com debounce para não chamar a API a cada tecla digitada
-    this.searchSubscription = this.searchSubject.pipe(
-      debounceTime(400),
-      distinctUntilChanged()
-    ).subscribe(searchTerm => {
-      this.performSearch(searchTerm);
-    });
+    this.searchSubscription = this.searchSubject.pipe(debounceTime(400), distinctUntilChanged())
+      .subscribe(searchTerm => this.performSearch(searchTerm));
   }
   
-  ngOnDestroy() {
-    // Limpa a inscrição para evitar vazamentos de memória
-    this.searchSubscription?.unsubscribe();
-  }
+  ngOnDestroy() { this.searchSubscription?.unsubscribe(); }
 
   checkLoginStatus() {
     const token = localStorage.getItem('pokedex_token');
@@ -269,12 +253,52 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isLoadingInitialData = false;
     }
   }
+  
+  setView(view: 'all' | 'favorites' | 'battleTeam') {
+    this.currentView = view;
+    this.searchTerm = '';
+    this.isSearching = false;
+    this.apiError = null;
+    
+    if (view === 'all') {
+      this.isSpecialView = false;
+      this.onGenerationChange(this.selectedGenerationId.toString());
+    } else {
+      this.isSpecialView = true;
+      this.loadSpecialList();
+    }
+  }
 
-  setView(view: 'all' | 'favorites' | 'battleTeam') { this.currentView = view; }
+  loadSpecialList() {
+    this.isLoadingInitialData = true;
+    this.pokemons = [];
+
+    const isFavorites = this.currentView === 'favorites';
+    const codes = Array.from(this.userPokemonsMap.values())
+        .filter(p => isFavorites ? p.favorito : p.grupo_batalha)
+        .map(p => p.codigo);
+
+    if (codes.length === 0) {
+      this.isLoadingInitialData = false;
+      return;
+    }
+
+    const token = localStorage.getItem('pokedex_token');
+    if (!token) { this.isLoadingInitialData = false; return; }
+    const headers = new HttpHeaders().set('x-access-token', token);
+
+    this.http.post<ApiPokemon[]>(`${this.apiUrl}/pokemon/batch`, { codes }, { headers }).subscribe({
+        next: (apiPokemons) => {
+            this.pokemons = this.mapApiPokemons(apiPokemons);
+            this.isLoadingInitialData = false;
+        },
+        error: (err) => this.handleApiError(err)
+    });
+  }
 
   onGenerationChange(newGenId: string) {
     this.selectedGenerationId = Number(newGenId);
-    this.searchTerm = ''; // Limpa a busca ao trocar de geração
+    this.searchTerm = '';
     this.loadInitialPokemons();
   }
   
@@ -296,6 +320,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.offset = 0; this.allPokemonsLoaded = false;
     this.userPokemonsMap.clear(); this.loginData = { login: '', senha: '' };
     this.currentView = 'all'; this.searchTerm = ''; this.selectedGenerationId = 0;
+    this.isSpecialView = false;
   }
 
   loadInitialPokemons() {
@@ -303,12 +328,9 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!token) return;
     const headers = new HttpHeaders().set('x-access-token', token);
     
-    // CORREÇÃO: Usar '==' para comparar o ID da geração, pois o valor do select vem como string.
     const selectedGen = this.generations.find(g => g.id == this.selectedGenerationId) ?? this.generations[0];
     
-    this.isLoadingInitialData = true;
-    this.apiError = null;
-    this.pokemons = []; 
+    this.isLoadingInitialData = true; this.apiError = null; this.pokemons = []; 
     this.offset = selectedGen.offset;
 
     const limit = this.selectedGenerationId === 0 ? this.POKEMON_PAGE_LIMIT : selectedGen.limit;
@@ -329,7 +351,10 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   loadMorePokemons() {
-    if (this.isLoadingMore || this.allPokemonsLoaded || this.selectedGenerationId !== 0) return;
+    // a func é chamada pelo listener de scroll, entao as condicoes ja foram verificadas la.
+    // apneas a checagem 'isLoadingMore' e necessaria aqui para evitar chamadas duplas.
+    if (this.isLoadingMore) return;
+
     const token = localStorage.getItem('pokedex_token');
     if (!token) return;
     const headers = new HttpHeaders().set('x-access-token', token);
@@ -338,16 +363,19 @@ export class AppComponent implements OnInit, OnDestroy {
     this.http.get<ApiPokemon[]>(`${this.apiUrl}/pokemon?limit=${this.POKEMON_PAGE_LIMIT}&offset=${this.offset}`, { headers })
       .subscribe({
         next: (newApiPokemons) => {
-          this.pokemons.push(...this.mapApiPokemons(newApiPokemons));
-          this.offset += this.POKEMON_PAGE_LIMIT;
+          if (newApiPokemons.length > 0) {
+            this.pokemons.push(...this.mapApiPokemons(newApiPokemons));
+            this.offset += this.POKEMON_PAGE_LIMIT;
+          }
+          if (newApiPokemons.length < this.POKEMON_PAGE_LIMIT) {
+            this.allPokemonsLoaded = true;
+          }
           this.isLoadingMore = false;
-          if (newApiPokemons.length < this.POKEMON_PAGE_LIMIT) this.allPokemonsLoaded = true;
         },
         error: (err) => { this.isLoadingMore = false; this.handleApiError(err); }
       });
   }
   
-  // --- NOVOS MÉTODOS PARA BUSCA GLOBAL ---
   onSearchTermChange(term: string): void {
     this.searchTerm = term;
     this.searchSubject.next(term);
@@ -357,14 +385,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.apiError = null;
     if (!term.trim()) {
       this.isSearching = false;
-      this.loadInitialPokemons(); // Restaura a lista da geração selecionada
+      this.setView(this.currentView);
       return;
     }
 
-    this.isSearching = true;
-    this.isLoadingInitialData = true; 
-    this.pokemons = [];
-
+    this.isSearching = true; this.isLoadingInitialData = true; this.pokemons = [];
     const token = localStorage.getItem('pokedex_token');
     if (!token) return;
     const headers = new HttpHeaders().set('x-access-token', token);
@@ -375,11 +400,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.isLoadingInitialData = false;
       },
       error: (err) => {
-        if (err.status === 404) {
-          this.apiError = `Pokémon "${term}" não encontrado.`;
-        } else {
-          this.apiError = 'Erro ao buscar Pokémon.';
-        }
+        this.apiError = (err.status === 404) ? `Pokémon "${term}" não encontrado.` : 'Erro ao buscar Pokémon.';
         this.isLoadingInitialData = false;
       }
     });
@@ -444,4 +465,4 @@ export class AppComponent implements OnInit, OnDestroy {
   
   capitalizeFirstLetter(name: string): string { return name ? name.charAt(0).toUpperCase() + name.slice(1) : ''; }
   onImageError(event: Event) { (event.target as HTMLImageElement).src = 'https://placehold.co/160x160/f8f8f8/ccc?text=Pkm'; }
-}
+}  

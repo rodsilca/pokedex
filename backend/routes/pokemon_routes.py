@@ -62,4 +62,25 @@ def get_pokemon_by_name(current_user, name):
     except Exception as e:
         return jsonify({"error": f"Ocorreu um erro inesperado: {e}"}), 500
 
+@bp.route('/api/pokemon/batch', methods=['POST'])
+@token_required
+def get_pokemon_batch(current_user):
+    data = request.get_json()
+    codes = data.get('codes')
+    if not codes or not isinstance(codes, list):
+        return jsonify({"message": "Lista de códigos é necessária."}), 400
+
+    pokemon_urls = [f"https://pokeapi.co/api/v2/pokemon/{str(code).lower()}" for code in codes]
+    pokemon_list = []
     
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_url = {executor.submit(fetch_pokemon_details, url): url for url in pokemon_urls}
+        for future in as_completed(future_to_url):
+            result = future.result()
+            if result:
+                pokemon_list.append(result)
+    
+    pokemon_list.sort(key=lambda p: p['id'])
+    for p in pokemon_list: p['id'] = str(p['id'])
+    
+    return jsonify(pokemon_list)
