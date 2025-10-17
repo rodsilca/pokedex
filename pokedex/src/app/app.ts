@@ -203,7 +203,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   selectedGenerationId: number = 0;
   generations = [
-    { id: 0, name: 'Todas as Gerações', limit: this.POKEMON_PAGE_LIMIT, offset: 0 },
+    { id: 0, name: 'Todas as Gerações', limit: 1025, offset: 0 },
     { id: 1, name: 'Geração 1', limit: 151, offset: 0 }, 
     { id: 2, name: 'Geração 2', limit: 100, offset: 151 },
     { id: 3, name: 'Geração 3', limit: 135, offset: 251 }, 
@@ -226,7 +226,7 @@ export class AppComponent implements OnInit, OnDestroy {
   
   @HostListener('window:scroll', [])
   onWindowScroll(): void {
-    if (this.isSpecialView || this.isSearching || this.selectedGenerationId !== 0 || this.allPokemonsLoaded || this.isLoadingMore) {
+    if (this.isSpecialView || this.isSearching || this.allPokemonsLoaded || this.isLoadingMore) {
       return;
     }
     const pos = (document.documentElement.scrollTop || document.body.scrollTop) + document.documentElement.offsetHeight;
@@ -334,9 +334,10 @@ export class AppComponent implements OnInit, OnDestroy {
     
     this.isLoadingInitialData = true; this.apiError = null; this.pokemons = []; 
     this.offset = selectedGen.offset;
+    this.allPokemonsLoaded = false;
 
-    const limit = this.selectedGenerationId === 0 ? this.POKEMON_PAGE_LIMIT : selectedGen.limit;
-    this.allPokemonsLoaded = this.selectedGenerationId !== 0;
+    // carga inicial e sempre de 20 pokemon
+    const limit = this.POKEMON_PAGE_LIMIT;
 
     forkJoin({
       apiPokemons: this.http.get<ApiPokemon[]>(`${this.apiUrl}/pokemon?limit=${limit}&offset=${this.offset}`, { headers }),
@@ -359,14 +360,30 @@ export class AppComponent implements OnInit, OnDestroy {
     const headers = new HttpHeaders().set('x-access-token', token);
 
     this.isLoadingMore = true;
-    this.http.get<ApiPokemon[]>(`${this.apiUrl}/pokemon?limit=${this.POKEMON_PAGE_LIMIT}&offset=${this.offset}`, { headers })
+
+    // define o final do range da geracao atual para saber quando parar
+    const selectedGen = this.generations.find(g => g.id === this.selectedGenerationId) ?? this.generations[0];
+    const endOfGenerationOffset = selectedGen.offset + selectedGen.limit;
+    
+    // calcula quantos pokemons faltam para carregar
+    const remaining = endOfGenerationOffset - this.offset;
+    const limit = Math.min(this.POKEMON_PAGE_LIMIT, remaining);
+
+    if (limit <= 0) {
+      this.allPokemonsLoaded = true;
+      this.isLoadingMore = false;
+      return;
+    }
+
+    this.http.get<ApiPokemon[]>(`${this.apiUrl}/pokemon?limit=${limit}&offset=${this.offset}`, { headers })
       .subscribe({
         next: (newApiPokemons) => {
           if (newApiPokemons.length > 0) {
             this.pokemons.push(...this.mapApiPokemons(newApiPokemons));
-            this.offset += this.POKEMON_PAGE_LIMIT;
+            this.offset += newApiPokemons.length;
           }
-          if (newApiPokemons.length < this.POKEMON_PAGE_LIMIT) {
+          // se carregar menos que o limite, ou alcanca o final da geracao, para
+          if (newApiPokemons.length < limit || this.offset >= endOfGenerationOffset) {
             this.allPokemonsLoaded = true;
           }
           this.isLoadingMore = false;
@@ -462,7 +479,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // validacao senha
+    // validacao da senha
     if (this.registerData.senha.length < 6) {
       this.authError = 'A senha deve ter no mínimo 6 caracteres.';
       return;
@@ -473,7 +490,6 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // se a validacao passar, envia para a api
     this.http.post<any>(`${this.apiUrl}/register`, this.registerData).subscribe({
       next: (res) => { 
         this.authSuccess = `${res.message} Agora pode fazer o login.`; 
