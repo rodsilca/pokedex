@@ -33,8 +33,8 @@ export interface User { id: number; nome: string; login: string; }
 
       <main class="container">
         <div *ngIf="!isLoggedIn; else pokedexContent">
-          <!-- Bloco de Autenticação (sem mudanças) -->
-          <div class.auth-container>
+          <!-- Bloco de Autenticação -->
+          <div class="auth-container">
             <div *ngIf="authMode === 'login'" class="auth-form">
               <h2>Acessar sua Pokédex</h2><p>Faça login para ver seus Pokémon.</p>
               <form (ngSubmit)="onLoginSubmit()">
@@ -181,7 +181,6 @@ export interface User { id: number; nome: string; login: string; }
     .types-container { display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
     .type-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: white; text-transform: capitalize; }
     .type-grass { background-color: #78C850; } .type-fire { background-color: #F08030; } .type-water { background-color: #6890F0; } .type-bug { background-color: #A8B820; } .type-normal { background-color: #A8A878; } .type-poison { background-color: #A040A0; } .type-electric { background-color: #F8D030; } .type-ground { background-color: #E0C068; } .type-fairy { background-color: #EE99AC; } .type-fighting { background-color: #C03028; } .type-psychic { background-color: #F85888; } .type-rock { background-color: #B8A038; } .type-ghost { background-color: #705898; } .type-ice { background-color: #98D8D8; } .type-dragon { background-color: #7038F8; } .type-flying { background-color: #A890F0; } .type-steel { background-color: #B8B8D0; } .type-dark { background-color: #705848; }
-    /* NOVO: Estilo para o indicador de carregamento do scroll */
     .loading-more-indicator { text-align: center; padding: 2rem; color: #718096; font-weight: 600; }
   `]
 })
@@ -205,7 +204,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedGenerationId: number = 0;
   generations = [
     { id: 0, name: 'Todas as Gerações', limit: this.POKEMON_PAGE_LIMIT, offset: 0 },
-    { id: 1, name: 'Geração 1', limit: 151, offset: 0 },
+    { id: 1, name: 'Geração 1', limit: 151, offset: 0 }, 
     { id: 2, name: 'Geração 2', limit: 100, offset: 151 },
     { id: 3, name: 'Geração 3', limit: 135, offset: 251 }, 
     { id: 4, name: 'Geração 4', limit: 107, offset: 386 },
@@ -227,15 +226,11 @@ export class AppComponent implements OnInit, OnDestroy {
   
   @HostListener('window:scroll', [])
   onWindowScroll(): void {
-    // condicoes para ativar o scroll infinito
     if (this.isSpecialView || this.isSearching || this.selectedGenerationId !== 0 || this.allPokemonsLoaded || this.isLoadingMore) {
       return;
     }
-
     const pos = (document.documentElement.scrollTop || document.body.scrollTop) + document.documentElement.offsetHeight;
     const max = document.documentElement.scrollHeight;
-
-    // dispara a busca 300px antes de chegar ao fim da pagina
     if (pos >= max - 300) {
       this.loadMorePokemons();
     }
@@ -309,6 +304,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
   
   onLoginSubmit() {
+    this.authError = null;
     this.http.post<any>(`${this.apiUrl}/login`, this.loginData).subscribe({
       next: (res) => {
         localStorage.setItem('pokedex_token', res.token); localStorage.setItem('pokedex_user', JSON.stringify(res.user));
@@ -357,10 +353,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   loadMorePokemons() {
-    // a func é chamada pelo listener de scroll, entao as condicoes ja foram verificadas la.
-    // apneas a checagem 'isLoadingMore' e necessaria aqui para evitar chamadas duplas.
     if (this.isLoadingMore) return;
-
     const token = localStorage.getItem('pokedex_token');
     if (!token) return;
     const headers = new HttpHeaders().set('x-access-token', token);
@@ -459,9 +452,36 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onRegisterSubmit() {
+    this.authError = null;
+    this.authSuccess = null;
+
+    // validacao do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!this.registerData.email || !emailRegex.test(this.registerData.email)) {
+      this.authError = 'Por favor, insira um e-mail válido.';
+      return;
+    }
+
+    // validacao senha
+    if (this.registerData.senha.length < 6) {
+      this.authError = 'A senha deve ter no mínimo 6 caracteres.';
+      return;
+    }
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+    if (!specialCharRegex.test(this.registerData.senha)) {
+      this.authError = 'A senha deve conter pelo menos um caractere especial (ex: !@#$).';
+      return;
+    }
+
+    // se a validacao passar, envia para a api
     this.http.post<any>(`${this.apiUrl}/register`, this.registerData).subscribe({
-      next: (res) => { this.authSuccess = `${res.message} Agora pode fazer o login.`; this.switchAuthMode('login'); },
-      error: (err) => { this.authError = err.error.message || 'Ocorreu um erro no registro.'; }
+      next: (res) => { 
+        this.authSuccess = `${res.message} Agora pode fazer o login.`; 
+        this.switchAuthMode('login'); 
+      },
+      error: (err) => { 
+        this.authError = err.error.message || 'Ocorreu um erro no registro.'; 
+      }
     });
   }
 
@@ -471,4 +491,5 @@ export class AppComponent implements OnInit, OnDestroy {
   
   capitalizeFirstLetter(name: string): string { return name ? name.charAt(0).toUpperCase() + name.slice(1) : ''; }
   onImageError(event: Event) { (event.target as HTMLImageElement).src = 'https://placehold.co/160x160/f8f8f8/ccc?text=Pkm'; }
-}  
+}
+
