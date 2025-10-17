@@ -182,6 +182,33 @@ export interface User { id: number; nome: string; login: string; }
     .type-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: white; text-transform: capitalize; }
     .type-grass { background-color: #78C850; } .type-fire { background-color: #F08030; } .type-water { background-color: #6890F0; } .type-bug { background-color: #A8B820; } .type-normal { background-color: #A8A878; } .type-poison { background-color: #A040A0; } .type-electric { background-color: #F8D030; } .type-ground { background-color: #E0C068; } .type-fairy { background-color: #EE99AC; } .type-fighting { background-color: #C03028; } .type-psychic { background-color: #F85888; } .type-rock { background-color: #B8A038; } .type-ghost { background-color: #705898; } .type-ice { background-color: #98D8D8; } .type-dragon { background-color: #7038F8; } .type-flying { background-color: #A890F0; } .type-steel { background-color: #B8B8D0; } .type-dark { background-color: #705848; }
     .loading-more-indicator { text-align: center; padding: 2rem; color: #718096; font-weight: 600; }
+
+    @media (max-width: 768px) {
+      .filters-container, .search-and-gen-filters {
+        flex-direction: column;
+        align-items: stretch; 
+      }
+
+      .view-tabs {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .search-box input, .generation-filter select {
+        width: 100%;
+        box-sizing: border-box; 
+      }
+    }
+    
+    @media (min-width: 769px) {
+      .search-and-gen-filters {
+        flex-direction: row; 
+      }
+      .search-box input {
+        width: 250px;
+      }
+    }
+
   `]
 })
 export class AppComponent implements OnInit, OnDestroy {
