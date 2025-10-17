@@ -8,6 +8,8 @@ class Usuario(db.Model):
     login = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     senha = db.Column(db.String(200), nullable=False)
+    dt_inclusao = db.Column(db.DateTime, default=datetime.utcnow)
+    dt_alteracao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     pokemons = db.relationship('PokemonUsuario', backref='usuario', lazy=True)
 
     def set_password(self, password):
