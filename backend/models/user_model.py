@@ -1,4 +1,5 @@
 from models import db,bcrypt
+import datetime
 
 class Usuario(db.Model):
     __tablename__ = 'usuario'
