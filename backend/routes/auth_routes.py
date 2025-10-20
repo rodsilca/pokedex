@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from models import db
 from models.user_model import Usuario
 import jwt
-import datetime
+from datetime import datetime, timezone
 
 bp = Blueprint('auth_routes',__name__)
 
@@ -23,5 +23,5 @@ def login_user():
     user = Usuario.query.filter_by(login=data['login']).first()
     if not user or not user.check_password(data['senha']):
         return jsonify({'message': 'Credenciais inválidas!'}), 401
-    token = jwt.encode({'id_usuario': user.id_usuario, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)}, current_app.config['SECRET_KEY'], algorithm='HS256')
+    token = jwt.encode({'id_usuario': user.id_usuario, 'exp': datetime.now(timezone.utc) + datetime.timedelta(hours=24)}, current_app.config['SECRET_KEY'], algorithm='HS256')
     return jsonify({'token': token, 'user': {'id': user.id_usuario, 'nome': user.nome, 'login': user.login}})
