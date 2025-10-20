@@ -269,13 +269,16 @@ export class AppComponent implements OnInit, OnDestroy {
       .subscribe(searchTerm => this.performSearch(searchTerm));
   }
   
-  ngOnDestroy() { this.searchSubscription?.unsubscribe(); }
+  ngOnDestroy() { 
+    this.searchSubscription?.unsubscribe(); 
+  }
 
   checkLoginStatus() {
     const token = localStorage.getItem('pokedex_token');
     const userData = localStorage.getItem('pokedex_user');
     if (token && userData) {
-      this.isLoggedIn = true; this.user = JSON.parse(userData);
+      this.isLoggedIn = true; 
+      this.user = JSON.parse(userData);
       this.loadInitialPokemons();
     } else {
       this.isLoadingInitialData = false;
